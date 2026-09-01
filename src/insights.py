@@ -100,10 +100,11 @@ def rule_underrated_highlight(movies_df: pd.DataFrame) -> Optional[str]:
     if underrated.empty:
         return None
     top_movie = underrated.iloc[0]
-    title = top_movie["title"]
-    yr = int(top_movie["release_year"]) if pd.notna(top_movie["release_year"]) else ""
-    rate = top_movie["vote_average"]
-    return f"**{title}** ({yr}) stands out as an underrated gem: scoring **{rate:.1f} ★** while maintaining modest popularity compared to its release cohort."
+    title = top_movie.get("title", "Untitled")
+    yr_val = top_movie.get("release_year")
+    yr_str = f" ({int(yr_val)})" if pd.notna(yr_val) and yr_val == yr_val else ""
+    rate = top_movie.get("vote_average", 0.0)
+    return f"**{title}**{yr_str} stands out as an underrated gem: scoring **{rate:.1f} ★** while maintaining modest popularity compared to its release cohort."
 
 
 def rule_revenue_trend(movies_df: pd.DataFrame) -> Optional[str]:

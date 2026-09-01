@@ -563,19 +563,16 @@ def compute_underrated_movies(
     if len(valid) < 20:
         return pd.DataFrame()
         
-    def _calc_z(grp):
-        if len(grp) >= 5:
-            r_std = grp["vote_average"].std()
-            p_std = grp["popularity"].std()
-            grp["rating_z"] = (grp["vote_average"] - grp["vote_average"].mean()) / (r_std if r_std > 0 else 1.0)
-            grp["pop_z"] = (grp["popularity"] - grp["popularity"].mean()) / (p_std if p_std > 0 else 1.0)
-        else:
-            grp["rating_z"] = np.nan
-            grp["pop_z"] = np.nan
-        return grp
+    r_mean = valid.groupby("release_year")["vote_average"].transform("mean")
+    r_std = valid.groupby("release_year")["vote_average"].transform("std").fillna(0)
+    p_mean = valid.groupby("release_year")["popularity"].transform("mean")
+    p_std = valid.groupby("release_year")["popularity"].transform("std").fillna(0)
+    cohort_count = valid.groupby("release_year")["vote_average"].transform("count")
 
-    scored = valid.groupby("release_year", group_keys=False).apply(_calc_z)
-    underrated = scored[(scored["rating_z"] >= 1.28) & (scored["pop_z"] <= 0.0)].copy()
+    valid["rating_z"] = np.where((cohort_count >= 5) & (r_std > 0), (valid["vote_average"] - r_mean) / r_std, np.nan)
+    valid["pop_z"] = np.where((cohort_count >= 5) & (p_std > 0), (valid["popularity"] - p_mean) / p_std, np.nan)
+
+    underrated = valid[(valid["rating_z"] >= 1.28) & (valid["pop_z"] <= 0.0)].copy()
     if not underrated.empty:
         underrated.sort_values(by="rating_z", ascending=False, inplace=True)
         return underrated.head(top_n)
@@ -604,19 +601,16 @@ def compute_overhyped_movies(
     if len(valid) < 20:
         return pd.DataFrame()
         
-    def _calc_z(grp):
-        if len(grp) >= 5:
-            r_std = grp["vote_average"].std()
-            p_std = grp["popularity"].std()
-            grp["rating_z"] = (grp["vote_average"] - grp["vote_average"].mean()) / (r_std if r_std > 0 else 1.0)
-            grp["pop_z"] = (grp["popularity"] - grp["popularity"].mean()) / (p_std if p_std > 0 else 1.0)
-        else:
-            grp["rating_z"] = np.nan
-            grp["pop_z"] = np.nan
-        return grp
+    r_mean = valid.groupby("release_year")["vote_average"].transform("mean")
+    r_std = valid.groupby("release_year")["vote_average"].transform("std").fillna(0)
+    p_mean = valid.groupby("release_year")["popularity"].transform("mean")
+    p_std = valid.groupby("release_year")["popularity"].transform("std").fillna(0)
+    cohort_count = valid.groupby("release_year")["vote_average"].transform("count")
 
-    scored = valid.groupby("release_year", group_keys=False).apply(_calc_z)
-    overhyped = scored[(scored["pop_z"] >= 1.28) & (scored["rating_z"] <= 0.0)].copy()
+    valid["rating_z"] = np.where((cohort_count >= 5) & (r_std > 0), (valid["vote_average"] - r_mean) / r_std, np.nan)
+    valid["pop_z"] = np.where((cohort_count >= 5) & (p_std > 0), (valid["popularity"] - p_mean) / p_std, np.nan)
+
+    overhyped = valid[(valid["pop_z"] >= 1.28) & (valid["rating_z"] <= 0.0)].copy()
     if not overhyped.empty:
         overhyped.sort_values(by="pop_z", ascending=False, inplace=True)
         return overhyped.head(top_n)
