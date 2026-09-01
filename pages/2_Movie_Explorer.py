@@ -1,15 +1,18 @@
-"""Page 2: Movie Explorer & Catalog Browser."""
-import math
+"""Page 2: Movie Catalog Explorer (Redesigned SaaS Search & Profile Inspector)."""
 import streamlit as st
 import pandas as pd
 
-from src.components import empty_state, inject_custom_css, page_header
+from src.components import (
+    empty_state,
+    filter_status_bar,
+    inject_custom_css,
+    movie_profile_card,
+    page_header
+)
 from src.data_loader import load_movies
 from src.filters import apply_global_filters, render_global_filters
-from src.utils import format_currency, format_number, format_pct
 
 inject_custom_css()
-page_header("🔍 Movie Explorer", "Search, filter, sort, and inspect granular details across the complete movie catalog.")
 
 # 1. Lazy load fact table
 movies_df = load_movies()
@@ -18,123 +21,109 @@ movies_df = load_movies()
 filters = render_global_filters(movies_df)
 filtered_df = apply_global_filters(movies_df, filters)
 
-# 3. Search & Sort Controls
-st.markdown("### 🔎 Catalog Search & Sorting")
-c_search, c_sort, c_order = st.columns([2, 1.2, 0.8])
-
-with c_search:
-    search_query = st.text_input("Search Title or Substring", placeholder="e.g. Inception, Godfather, Avatar...").strip()
-
-with c_sort:
-    sort_field = st.selectbox(
-        "Sort By",
-        options=["vote_average", "popularity", "revenue", "release_year", "profit", "roi", "runtime"],
-        format_func=lambda x: {
-            "vote_average": "Rating ★",
-            "popularity": "Popularity",
-            "revenue": "Box Office Revenue",
-            "release_year": "Release Year",
-            "profit": "Net Profit",
-            "roi": "ROI Multiplier",
-            "runtime": "Runtime"
-        }.get(x, x)
-    )
-
-with c_order:
-    sort_order = st.radio("Order", ["Descending", "Ascending"], horizontal=True)
-
-# 4. Apply Vectorized Text Search
-if search_query:
-    title_mask = filtered_df["title"].fillna("").str.contains(search_query, case=False, regex=False)
-    orig_mask = (
-        filtered_df["original_title"].fillna("").str.contains(search_query, case=False, regex=False)
-        if "original_title" in filtered_df.columns else False
-    )
-    filtered_df = filtered_df[title_mask | orig_mask]
+# 3. Page Header & Filter Status
+page_header(
+    title="Movie Catalog Explorer",
+    subtitle="Vectorized substring search, multi-metric sorting, pagination, and structured film profile cards.",
+    eyebrow="CATALOG EXPLORER"
+)
+filter_status_bar(filters, len(movies_df), len(filtered_df))
 
 if filtered_df.empty:
-    empty_state(title="No matching movies found", message="No movies match your current search and filter combination.")
+    empty_state("No catalog titles found matching the active filter criteria.")
     st.stop()
 
-# 5. Sorting
+# 4. Search & Sort Controls (Dominant Search Bar)
+search_col, sort_col, order_col = st.columns([2.5, 1.2, 0.8])
+with search_col:
+    search_query = st.text_input(
+        "Search by Title or Keyword",
+        placeholder="Type a movie title (e.g. Inception, Godfather, Toy Story)...",
+        label_visibility="collapsed"
+    )
+with sort_col:
+    sort_by = st.selectbox(
+        "Sort By",
+        options=["popularity", "revenue", "vote_average", "profit", "release_year", "vote_count"],
+        format_func=lambda x: {
+            "popularity": "TMDB Popularity",
+            "revenue": "Box Office Gross",
+            "vote_average": "Audience Rating (★)",
+            "profit": "Net Box Office Profit",
+            "release_year": "Release Year",
+            "vote_count": "Vote Count"
+        }.get(x, x),
+        label_visibility="collapsed"
+    )
+with order_col:
+    sort_order = st.selectbox("Order", options=["Descending", "Ascending"], label_visibility="collapsed")
+
+# 5. Vectorized Search & Sort
+res_df = filtered_df
+if search_query.strip():
+    q = search_query.strip().lower()
+    mask = res_df["title"].str.lower().str.contains(q, na=False)
+    if "original_title" in res_df.columns:
+        mask = mask | res_df["original_title"].str.lower().str.contains(q, na=False)
+    res_df = res_df[mask]
+
+if res_df.empty:
+    empty_state(f"No movies found matching '{search_query}'", "Try checking for spelling or adjusting active filters.")
+    st.stop()
+
 ascending = (sort_order == "Ascending")
-filtered_df = filtered_df.sort_values(by=sort_field, ascending=ascending, na_position="last")
+if sort_by in res_df.columns:
+    res_df = res_df.sort_values(by=sort_by, ascending=ascending, na_position="last")
 
-# 6. Fast Pagination (25 items/page)
+# 6. Pagination Controls (25 items/page)
 PAGE_SIZE = 25
-total_items = len(filtered_df)
-total_pages = max(1, math.ceil(total_items / PAGE_SIZE))
+total_results = len(res_df)
+total_pages = max(1, (total_results + PAGE_SIZE - 1) // PAGE_SIZE)
 
-if "explorer_page" not in st.session_state:
-    st.session_state["explorer_page"] = 1
+p_col1, p_col2 = st.columns([1, 4])
+with p_col1:
+    page_num = st.number_input(f"Page (of {total_pages})", min_value=1, max_value=total_pages, value=1, step=1)
+with p_col2:
+    st.markdown(
+        f'<div style="font-size: 0.85rem; color: var(--text-muted); padding-top: 0.6rem;">Displaying <strong>{(page_num-1)*PAGE_SIZE + 1}</strong> – <strong>{min(page_num*PAGE_SIZE, total_results)}</strong> of <strong>{total_results:,}</strong> matching records</div>',
+        unsafe_allow_html=True
+    )
 
-col_pg_info, col_pg_nav = st.columns([2, 1])
-with col_pg_info:
-    st.caption(f"Showing {total_items:,} movies (Page {st.session_state['explorer_page']} of {total_pages})")
-with col_pg_nav:
-    page_num = st.number_input("Go to page", min_value=1, max_value=total_pages, value=st.session_state["explorer_page"], step=1)
-    st.session_state["explorer_page"] = page_num
+start_idx = (page_num - 1) * PAGE_SIZE
+page_slice = res_df.iloc[start_idx : start_idx + PAGE_SIZE]
 
-start_idx = (st.session_state["explorer_page"] - 1) * PAGE_SIZE
-end_idx = min(start_idx + PAGE_SIZE, total_items)
-page_items = filtered_df.iloc[start_idx:end_idx]
+# 7. Split Layout: Catalog Table (Left) + Selected Movie Profile (Right)
+col_table, col_profile = st.columns([1.1, 1.3])
 
-st.markdown("---")
-
-# 7. Movie Detail Inspector
-st.markdown("### 🎬 Movie Detail Inspector")
-selected_title = st.selectbox(
-    "Select a title from current page results for full breakdown:",
-    options=page_items["title"].tolist(),
-    index=0
-)
-
-selected_movie = page_items[page_items["title"] == selected_title].iloc[0]
-
-with st.container():
-    m_col1, m_col2 = st.columns([1.5, 1])
+with col_table:
+    st.markdown('<div style="font-size: 0.95rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.5rem;">Catalog Results</div>', unsafe_allow_html=True)
     
-    with m_col1:
-        st.markdown(f"## {selected_movie['title']} ({int(selected_movie['release_year']) if pd.notna(selected_movie['release_year']) else 'N/A'})")
-        if pd.notna(selected_movie.get("tagline")) and selected_movie.get("tagline"):
-            st.markdown(f"*\"{selected_movie['tagline']}\"*")
-            
-        st.markdown(f"**Overview:** {selected_movie.get('overview', 'No overview summary available.')}")
-        st.markdown(f"**Director:** `{selected_movie.get('director_display', 'Not credited')}`")
-        st.markdown(f"**Top Cast:** `{selected_movie.get('top_cast_display', 'Not credited')}`")
-        
-        genres_str = str(selected_movie.get("genres_display", ""))
-        chips_html = "".join([f'<span class="genre-chip">{g.strip()}</span>' for g in genres_str.split(",") if g.strip()])
-        st.markdown(f"**Genres:** {chips_html}", unsafe_allow_html=True)
-        
-        kw_str = str(selected_movie.get("keywords_display", ""))
-        kw_html = "".join([f'<span class="keyword-chip">{k.strip()}</span>' for k in kw_str.split(",")[:8] if k.strip()])
-        st.markdown(f"**Themes:** {kw_html}", unsafe_allow_html=True)
-        
-    with m_col2:
-        st.markdown("#### 📊 Financial & Critical Profile")
-        st.write(f"**Rating:** {selected_movie.get('vote_average', 'N/A')} ★ ({int(selected_movie.get('vote_count', 0)):,} votes)")
-        st.write(f"**Popularity:** {selected_movie.get('popularity', 'N/A'):.2f}")
-        st.write(f"**Budget:** {format_currency(selected_movie.get('budget'))}")
-        st.write(f"**Box Office Revenue:** {format_currency(selected_movie.get('revenue'))}")
-        st.write(f"**Net Profit:** {format_currency(selected_movie.get('profit'))}")
-        st.write(f"**ROI Multiplier:** {format_pct(selected_movie.get('roi')) if pd.notna(selected_movie.get('roi')) else 'Not calculated'}")
-        st.write(f"**Runtime:** {int(selected_movie.get('runtime')) if pd.notna(selected_movie.get('runtime')) and selected_movie.get('runtime') > 0 else 'Not reported'} min")
-        st.write(f"**Language:** `{selected_movie.get('original_language', 'N/A')}`")
+    # Selectable title list
+    titles_in_page = page_slice["title"].fillna("Untitled").tolist()
+    default_selected = titles_in_page[0] if titles_in_page else None
+    
+    selected_title = st.selectbox(
+        "Select Movie to Inspect Profile:",
+        options=titles_in_page,
+        index=0,
+        help="Select a title from this page to view its comprehensive intelligence profile."
+    )
+    
+    # Summary Table for the page
+    table_view = page_slice[["title", "release_year", "genres_display", "vote_average", "revenue"]].rename(columns={
+        "title": "Title",
+        "release_year": "Year",
+        "genres_display": "Genres",
+        "vote_average": "Rating ★",
+        "revenue": "Gross ($)"
+    })
+    st.dataframe(table_view, use_container_width=True, hide_index=True)
 
-st.markdown("---")
-st.markdown("### 📋 Page Catalog Table")
-display_cols = ["title", "release_year", "genres_display", "vote_average", "vote_count", "revenue", "budget", "director_display"]
-grid_view = page_items[[c for c in display_cols if c in page_items.columns]].copy()
-grid_view.rename(columns={
-    "title": "Title",
-    "release_year": "Year",
-    "genres_display": "Genres",
-    "vote_average": "Rating ★",
-    "vote_count": "Votes",
-    "revenue": "Revenue ($)",
-    "budget": "Budget ($)",
-    "director_display": "Director"
-}, inplace=True)
-
-st.dataframe(grid_view, use_container_width=True, hide_index=True)
+with col_profile:
+    st.markdown('<div style="font-size: 0.95rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.5rem;">Film Intelligence Profile</div>', unsafe_allow_html=True)
+    
+    selected_row = page_slice[page_slice["title"] == selected_title]
+    if not selected_row.empty:
+        movie_profile_card(selected_row.iloc[0].to_dict())
+    else:
+        st.info("Select a title on the left to inspect its profile.")
