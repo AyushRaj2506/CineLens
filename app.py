@@ -1,21 +1,21 @@
-"""CineLens Analytics — Main Application Portal & Shell."""
+"""CineLens Analytics — Main Application Shell & Entry Point (7-Section Architecture)."""
 from pathlib import Path
 import streamlit as st
 
-from src.components import filter_status_bar, inject_custom_css, kpi_card, page_header
-from src.data_loader import load_movies, load_overview_kpis
+from src.components import inject_custom_css, kpi_card, page_header
+from src.data_loader import load_movies
 from src.filters import apply_global_filters, render_global_filters
 from src.utils import format_currency, format_number
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="CineLens Analytics — Movie Intelligence Platform",
+    page_title="CineLens Analytics — Movie Intelligence Dashboard",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject Central Design System
+# 2. Inject Design Tokens & Typography
 inject_custom_css()
 
 # 3. Check for preprocessed data
@@ -24,104 +24,76 @@ if not processed_movies_file.exists():
     st.error("⚠️ Processed dataset not found! Please run `python scripts/preprocess.py` to generate optimized Parquet files.")
     st.stop()
 
-# 4. Lazy Load Fact Table
-movies_df = load_movies()
+# 4. Lazy Load ONLY Fact Table for Instant Startup
+with st.spinner("Loading CineLens database..."):
+    movies_df = load_movies()
 
 # 5. Render Global Sidebar Filters
 filters = render_global_filters(movies_df)
 filtered_movies = apply_global_filters(movies_df, filters)
 
-# 6. Hero Page Header
+# 6. Welcome Header & Portal Overview
 page_header(
-    title="Executive Movie Intelligence",
-    subtitle="Interactive analytical dashboard exploring box office outcomes, creative talent, genre dynamics, and global production trends across 45,000+ films.",
-    eyebrow="PLATFORM PORTAL"
+    title="🎬 CineLens Analytics",
+    subtitle="Enterprise movie intelligence, catalog analytics, and box office insights powered by normalized relational data."
 )
 
-# 7. Active Filter Status Strip
-filter_status_bar(filters, len(movies_df), len(filtered_movies))
+st.sidebar.markdown("---")
+with st.sidebar.expander("ℹ️ About Dataset & Cleaning Audit"):
+    st.markdown("""
+    **Dataset Scope:** 45,000+ catalog titles from TMDB metadata, credits, and keywords.
+    - **Dropped Corruptions:** 3 malformed rows with date strings in `id`.
+    - **Deduplication:** Fact table deduplicated via completeness heuristics.
+    - **Status Filter:** Excluded 351 unreleased titles (Rumored, Planned, In Production, Canceled).
+    - **Zero-to-NaN:** 0 budget, revenue, and runtime converted to `NaN` to prevent severe distortion.
+    - **Relational Integrity:** Zero orphan IDs; independent bridge tables prevent double-counting.
+    """)
 
-# 8. Core KPI Summary Row
-col1, col2, col3, col4, col5 = st.columns(5)
+# Quick KPI Summary Banner
+col1, col2, col3, col4 = st.columns(4)
 is_default = (len(filtered_movies) == len(movies_df))
 
 if is_default:
+    from src.data_loader import load_overview_kpis
     kpi_df = load_overview_kpis()
     if not kpi_df.empty:
         k_row = kpi_df.iloc[0]
-        with col1: kpi_card("Catalog Titles", format_number(k_row["total_movies"]), subtitle="Full archive", icon="🎞️")
-        with col2: kpi_card("Total Box Office", format_currency(k_row["total_revenue"]), subtitle="7,014 reporting", icon="💰")
-        with col3: kpi_card("Avg Revenue / Film", format_currency(k_row["avg_revenue"]), subtitle="Non-zero revenue", icon="💵")
-        with col4: kpi_card("Avg Rating", f"{k_row['avg_rating']:.2f} ★", subtitle="Votes ≥ 20", icon="⭐")
-        with col5: kpi_card("Avg Popularity", f"{k_row['avg_popularity']:.1f}", subtitle="TMDB score", icon="🔥")
+        with col1:
+            kpi_card("Catalog Titles", format_number(k_row["total_movies"]), subtitle="Full catalog", icon="🎥")
+        with col2:
+            kpi_card("Total Box Office", format_currency(k_row["total_revenue"]), subtitle="Reported gross revenue", icon="💰")
+        with col3:
+            kpi_card("Avg Catalog Rating", f"{k_row['avg_rating']:.2f} ★", subtitle="Min 20 votes", icon="⭐")
+        with col4:
+            kpi_card("Avg Popularity", f"{k_row['avg_popularity']:.1f}", subtitle="TMDB score", icon="🔥")
     else:
-        with col1: kpi_card("Catalog Titles", format_number(len(filtered_movies)), subtitle="Full archive", icon="🎞️")
+        with col1: kpi_card("Catalog Titles", format_number(len(filtered_movies)), icon="🎥")
         with col2: kpi_card("Total Box Office", format_currency(filtered_movies.loc[filtered_movies["revenue"] > 0, "revenue"].sum()), icon="💰")
-        with col3: kpi_card("Avg Revenue", format_currency(filtered_movies.loc[filtered_movies["revenue"] > 0, "revenue"].mean()), icon="💵")
-        with col4: kpi_card("Avg Rating", f"{filtered_movies.loc[filtered_movies['vote_count'] >= 20, 'vote_average'].mean():.2f} ★", icon="⭐")
-        with col5: kpi_card("Avg Popularity", f"{filtered_movies['popularity'].mean():.1f}", icon="🔥")
+        with col3: kpi_card("Avg Catalog Rating", f"{filtered_movies.loc[filtered_movies['vote_count'] >= 20, 'vote_average'].mean():.2f} ★", icon="⭐")
+        with col4: kpi_card("Avg Popularity", f"{filtered_movies['popularity'].mean():.1f}", icon="🔥")
 else:
-    rev_sub = filtered_movies[filtered_movies["revenue"] > 0]
-    rate_sub = filtered_movies[filtered_movies["vote_count"] >= 20]
-    with col1: kpi_card("Filtered Titles", format_number(len(filtered_movies)), subtitle=f"of {len(movies_df):,} total", icon="🎞️")
-    with col2: kpi_card("Total Box Office", format_currency(rev_sub["revenue"].sum() if not rev_sub.empty else 0), subtitle=f"{len(rev_sub):,} reporting", icon="💰")
-    with col3: kpi_card("Avg Revenue", format_currency(rev_sub["revenue"].mean() if not rev_sub.empty else None), subtitle="In filtered scope", icon="💵")
-    with col4: kpi_card("Avg Rating", f"{rate_sub['vote_average'].mean():.2f} ★" if not rate_sub.empty else "N/A", subtitle="Votes ≥ 20", icon="⭐")
-    with col5: kpi_card("Avg Popularity", f"{filtered_movies['popularity'].mean():.1f}" if "popularity" in filtered_movies.columns else "N/A", subtitle="TMDB score", icon="🔥")
+    with col1:
+        kpi_card("Filtered Titles", format_number(len(filtered_movies)), subtitle=f"of {len(movies_df):,} total catalog", icon="🎥")
+    with col2:
+        rev_sum = filtered_movies.loc[filtered_movies["revenue"] > 0, "revenue"].sum()
+        kpi_card("Total Box Office", format_currency(rev_sum), subtitle="Reported gross revenue", icon="💰")
+    with col3:
+        rate_avg = filtered_movies.loc[filtered_movies["vote_count"] >= 20, "vote_average"].mean()
+        kpi_card("Avg Catalog Rating", f"{rate_avg:.2f} ★" if rate_avg == rate_avg else "N/A", subtitle="Min 20 votes", icon="⭐")
+    with col4:
+        kpi_card("Active Year Span", f"{filters.year_range[0]} – {filters.year_range[1]}", subtitle="Global slider selection", icon="📅")
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("""
+### 🧭 Navigation & Analytical Sections
+Select any of the **7 focused analytical sections** from the sidebar:
 
-# 9. Quick Launch Navigation Cards
-st.markdown('<div style="font-size: 1.15rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.85rem;">Analytical Suites</div>', unsafe_allow_html=True)
-
-nc1, nc2, nc3 = st.columns(3)
-with nc1:
-    st.markdown("""
-    <div class="kpi-card" style="min-height: 140px;">
-        <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">1. Executive Overview</div>
-        <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">Macro release trends, box office trajectory, rating distributions, and automated insights.</div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-    <div class="kpi-card" style="min-height: 140px; margin-top: 0.75rem;">
-        <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">4. Talent Intelligence</div>
-        <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">Director & Actor career track records, leaderboards, and interactive filmography timelines.</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with nc2:
-    st.markdown("""
-    <div class="kpi-card" style="min-height: 140px;">
-        <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">2. Movie Explorer</div>
-        <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">Instant vectorized title search, pagination, and comprehensive individual film intelligence profiles.</div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-    <div class="kpi-card" style="min-height: 140px; margin-top: 0.75rem;">
-        <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">5. Genres & Themes</div>
-        <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">Relational-safe cross-genre box office benchmarks and narrative plot keyword clustering.</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with nc3:
-    st.markdown("""
-    <div class="kpi-card" style="min-height: 140px;">
-        <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">3. Performance & Economics</div>
-        <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">Gross revenues, net profits, high-ROI multipliers, and WebGL Budget-Revenue regressions.</div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-    <div class="kpi-card" style="min-height: 140px; margin-top: 0.75rem;">
-        <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">6. Trends & Geography</div>
-        <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">Decadal genre evolutions and international ISO-3166-1 choropleth production footprint.</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-with st.expander("ℹ️ Data Architecture & Pipeline Audit"):
-    st.markdown("""
-    - **Source Catalog**: 45,083 unique feature films deduplicated from TMDB.
-    - **Zero Runtime JSON**: All JSON structures pre-exploded into relational Parquet bridge tables.
-    - **Safe Financials**: Converted unverified 0 values to `NaN` to prevent metric distortion.
-    - **Thresholding**: Minimum 20 votes required for statistical rating metrics.
-    """)
+| Section | Focus Area | Key Capabilities |
+|---|---|---|
+| **1. Overview** | Executive Summary | Macro catalog KPIs, release volume, box office trajectory, and automated insights. |
+| **2. Movie Explorer** | Catalog Search | Vectorized substring title search, multi-metric filtering, pagination (25/page), detail inspector. |
+| **3. Performance** | Financials & Ratings | High-grossing leaderboards, net profits, high-ROI rankings ($1M guard), WebGL regressions, rating dynamics. |
+| **4. People** | Talent Intelligence | Director & Actor leaderboards, career filmography timelines, career averages, genre specialization. |
+| **5. Genres & Themes** | Categories & Plot Tags | Relational-safe cross-genre box office benchmarks, single-genre deep-dives, thematic keyword clustering. |
+| **6. Trends** | Time Series & Geography | Decadal stacked genre evolution, annual volume growth, worldwide ISO-3166-1 production choropleth map. |
+| **7. Insights** | Statistical Modeling & Tools | Dynamic plain-language rule engine, z-score underrated/overhyped anomalies, side-by-side title comparison. |
+""")

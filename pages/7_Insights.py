@@ -1,15 +1,9 @@
-"""Page 7: Automated Insights & Movie Comparison (Redesigned SaaS Layout)."""
+"""Page 7: Automated Insights & Movie Comparison (Optimized Performance)."""
 import streamlit as st
 import pandas as pd
 
 from src.analytics import compute_overhyped_movies, compute_underrated_movies
-from src.components import (
-    empty_state,
-    filter_status_bar,
-    inject_custom_css,
-    insight_card,
-    page_header
-)
+from src.components import empty_state, inject_custom_css, insight_line, page_header
 from src.data_loader import load_actor_bridge, load_director_bridge, load_genre_bridge, load_movies
 from src.filters import apply_global_filters, render_global_filters
 from src.insights import generate_insights
@@ -17,31 +11,24 @@ from src.utils import VOTE_COUNT_MIN, format_currency, format_number, format_pct
 from src.visualizations import grouped_bar_chart
 
 inject_custom_css()
+page_header("🧠 Automated Insights & Comparison", "Algorithmic anomaly detection, automated catalog synthesis, and side-by-side title benchmarking.")
 
-# 1. Lazy load fact table
+# 1. Lazy load ONLY fact table
 movies_df = load_movies()
 
 # 2. Render sidebar filters & apply
 filters = render_global_filters(movies_df)
 filtered_df = apply_global_filters(movies_df, filters)
 
-# 3. Page Header & Filter Status
-page_header(
-    title="Algorithmic Insights & Comparison",
-    subtitle="Dynamic rule-based catalog synthesis, z-score statistical anomaly detection, and side-by-side title benchmarking.",
-    eyebrow="ANALYTICAL INTELLIGENCE"
-)
-filter_status_bar(filters, len(movies_df), len(filtered_df))
-
 if filtered_df.empty:
-    empty_state("No movie records found matching active filter criteria.")
+    empty_state("No movie records found for active filters.")
     st.stop()
 
-tab_insights, tab_comparison = st.tabs(["💡 Automated Synthesis & Outliers", "⚖️ Side-by-Side Comparison"])
+tab_insights, tab_comparison = st.tabs(["💡 Automated Synthesis & Anomalies", "⚖️ Movie Comparison Tool"])
 
 # ==================== TAB 1: INSIGHTS & ANOMALIES ====================
 with tab_insights:
-    st.markdown("### Algorithmic Catalog Intelligence")
+    st.markdown("### 💡 Dynamic Rule-Based Insight Engine")
     with st.spinner("Generating automated insights..."):
         genre_bridge = load_genre_bridge()
         actor_bridge = load_actor_bridge()
@@ -49,19 +36,19 @@ with tab_insights:
         insights = generate_insights("advanced", filtered_df, genre_bridge, actor_bridge, director_bridge)
         
     if insights:
-        for idx, item in enumerate(insights, 1):
-            insight_card(f"{idx:02d}", item)
+        for item in insights:
+            insight_line(item)
     else:
         st.info("Insufficient data in the active filter selection to generate automated insight rules.")
         
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 💎 Release-Cohort Statistical Outlier Models")
+    st.markdown("---")
+    st.markdown("### 💎 Statistical Cohort Outlier Detection")
     c_out1, c_out2 = st.columns(2)
     
     with c_out1:
         st.markdown("#### 💎 Underrated Gems")
-        with st.expander("Methodology ($z_{\\text{rating}} \\ge 1.28$, $z_{\\text{pop}} \\le 0.0$)", expanded=False):
-            st.caption("Films in top 10% rating z-score and bottom 50% popularity z-score relative to their release-year cohort (min 20 votes).")
+        with st.expander("Methodology ($z_{\\text{rating}} \\ge 1.28$, $z_{\\text{pop}} \\le 0.0$)"):
+            st.caption("Films in the top 10% rating z-score and bottom 50% popularity z-score relative to their release-year cohort (min 20 votes).")
         underrated = compute_underrated_movies(filtered_df, min_votes=VOTE_COUNT_MIN, top_n=10)
         if not underrated.empty:
             st.dataframe(
@@ -72,12 +59,12 @@ with tab_insights:
                 use_container_width=True
             )
         else:
-            st.write("No underrated outliers identified in active selection.")
+            st.write("No underrated outliers in selection.")
             
     with c_out2:
         st.markdown("#### 📢 Overhyped Titles")
-        with st.expander("Methodology ($z_{\\text{pop}} \\ge 1.28$, $z_{\\text{rating}} \\le 0.0$)", expanded=False):
-            st.caption("Films in top 10% popularity z-score and bottom 50% rating z-score relative to their release-year cohort.")
+        with st.expander("Methodology ($z_{\\text{pop}} \\ge 1.28$, $z_{\\text{rating}} \\le 0.0$)"):
+            st.caption("Films in the top 10% popularity z-score and bottom 50% rating z-score relative to their release-year cohort.")
         overhyped = compute_overhyped_movies(filtered_df, min_votes=VOTE_COUNT_MIN, top_n=10)
         if not overhyped.empty:
             st.dataframe(
@@ -88,12 +75,13 @@ with tab_insights:
                 use_container_width=True
             )
         else:
-            st.write("No overhyped outliers identified in active selection.")
+            st.write("No overhyped outliers in selection.")
 
 # ==================== TAB 2: COMPARISON ====================
 with tab_comparison:
-    st.markdown("### Side-by-Side Title Benchmarking")
+    st.markdown("### ⚖️ Side-by-Side Title Comparison")
     
+    # Pre-format select options cheaply
     options_series = filtered_df["title"].fillna("Untitled") + " (" + filtered_df["release_year"].fillna(0).astype(str) + ")"
     available_labels = options_series.tolist()
     
@@ -131,7 +119,7 @@ with tab_comparison:
             })
         st.dataframe(pd.DataFrame(metrics_data).set_index("Movie Title").T, use_container_width=True)
         
-        # Dual Grouped Charts
+        # Dual-Axis Grouped Charts
         col_comp1, col_comp2 = st.columns(2)
         with col_comp1:
             chart_crit = pd.DataFrame({

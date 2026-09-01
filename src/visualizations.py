@@ -1,79 +1,66 @@
-"""Centralized Plotly visualization wrappers with consistent dark cinematic theme and typography."""
+"""Centralized Plotly visualization wrappers with consistent dark theme and typography."""
 from typing import List, Optional
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Centralized Design Tokens
-PRIMARY_COLOR = "#7C5CFC"
-PRIMARY_LIGHT = "#9B87FF"
-SECONDARY_COLOR = "#38BDF8"
-ACCENT_FINANCE = "#F6B94A"
-POSITIVE_COLOR = "#34D399"
-NEGATIVE_COLOR = "#FB7185"
-RATING_COLOR = "#A78BFA"
+# Design theme color palette
+PRIMARY_COLOR = "#6C5CE7"
+SECONDARY_COLOR = "#00CEC9"
+ACCENT_COLOR = "#FDCB6E"
+BG_COLOR = "#0F1117"
+SURFACE_COLOR = "#171A23"
+TEXT_COLOR = "#EAECF0"
+TEXT_MUTED = "#9AA1B1"
+GRID_COLOR = "#262A38"
 
-BG_COLOR = "#090B12"
-SURFACE_COLOR = "#131722"
-SURFACE_ELEVATED = "#171C2A"
-TEXT_PRIMARY = "#F8FAFC"
-TEXT_SECONDARY = "#A8B1C5"
-TEXT_MUTED = "#737D92"
-BORDER_COLOR = "rgba(148, 163, 184, 0.13)"
-
-# Harmonious 8-color categorical palette (non-rainbow)
 COLOR_SEQUENCE = [
-    "#7C5CFC", "#38BDF8", "#F6B94A", "#34D399",
-    "#FB7185", "#A78BFA", "#F472B6", "#818CF8"
+    "#6C5CE7", "#00CEC9", "#FDCB6E", "#E17055", "#0984E3",
+    "#00B894", "#E84393", "#A29BFE", "#FD79A8", "#FFEAA7",
+    "#74B9FF", "#55EFC4", "#FAB1A0", "#DFE6E9", "#636E72"
 ]
 
 
-def _apply_theme(fig: go.Figure, title: str = "", height: int = 400) -> go.Figure:
-    """Apply consistent styling, typography, and dark theme layout to Plotly figures."""
+def _apply_theme(fig: go.Figure, title: str = "", height: int = 420) -> go.Figure:
+    """Apply consistent styling, fonts, and dark theme layout to Plotly figures."""
     fig.update_layout(
         title={
             "text": title,
-            "font": {"family": "Manrope, sans-serif", "size": 15, "color": TEXT_PRIMARY, "weight": "bold"},
+            "font": {"family": "Manrope, sans-serif", "size": 16, "color": "#FFFFFF", "weight": "bold"},
             "x": 0.0,
             "xanchor": "left"
         },
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font={"family": "Manrope, sans-serif", "color": TEXT_SECONDARY, "size": 12},
+        plot_bgcolor=SURFACE_COLOR,
+        font={"family": "Manrope, sans-serif", "color": TEXT_COLOR, "size": 12},
         height=height,
-        margin=dict(l=15, r=15, t=45, b=15),
+        margin=dict(l=20, r=20, t=50, b=20),
         legend=dict(
-            bgcolor="rgba(19, 23, 34, 0.8)",
-            bordercolor=BORDER_COLOR,
+            bgcolor="rgba(23, 26, 35, 0.7)",
+            bordercolor=GRID_COLOR,
             borderwidth=1,
-            font=dict(color=TEXT_SECONDARY, size=11),
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
+            font=dict(color=TEXT_COLOR, size=11)
         ),
         colorway=COLOR_SEQUENCE,
         hoverlabel=dict(
-            bgcolor=SURFACE_ELEVATED,
+            bgcolor="#1E2230",
             font_size=12,
             font_family="Manrope, sans-serif",
-            font_color=TEXT_PRIMARY,
             bordercolor=PRIMARY_COLOR
         )
     )
     fig.update_xaxes(
-        gridcolor="rgba(148, 163, 184, 0.08)",
-        zerolinecolor="rgba(148, 163, 184, 0.12)",
-        tickfont=dict(family="Manrope, sans-serif", color=TEXT_MUTED, size=11),
-        title_font=dict(family="Manrope, sans-serif", color=TEXT_SECONDARY, size=12)
+        gridcolor=GRID_COLOR,
+        zerolinecolor=GRID_COLOR,
+        tickfont=dict(color=TEXT_MUTED),
+        title_font=dict(color=TEXT_MUTED)
     )
     fig.update_yaxes(
-        gridcolor="rgba(148, 163, 184, 0.08)",
-        zerolinecolor="rgba(148, 163, 184, 0.12)",
-        tickfont=dict(family="Manrope, sans-serif", color=TEXT_MUTED, size=11),
-        title_font=dict(family="Manrope, sans-serif", color=TEXT_SECONDARY, size=12)
+        gridcolor=GRID_COLOR,
+        zerolinecolor=GRID_COLOR,
+        tickfont=dict(color=TEXT_MUTED),
+        title_font=dict(color=TEXT_MUTED)
     )
     return fig
 
@@ -86,14 +73,11 @@ def bar_chart(
     orientation: str = "v",
     color: Optional[str] = None,
     text: Optional[str] = None,
-    bar_color: Optional[str] = None,
-    height: int = 400
+    height: int = 420
 ) -> go.Figure:
-    """Standardized bar chart with rounded corners and clean hover data."""
+    """Standardized bar chart."""
     if df.empty:
         return _apply_theme(go.Figure(), title, height)
-    
-    color_seq = [bar_color] if bar_color else COLOR_SEQUENCE
     fig = px.bar(
         df,
         x=x,
@@ -101,7 +85,7 @@ def bar_chart(
         orientation=orientation,
         color=color,
         text=text,
-        color_discrete_sequence=color_seq
+        color_discrete_sequence=COLOR_SEQUENCE
     )
     if orientation == "h":
         fig.update_layout(yaxis=dict(autorange="reversed"))
@@ -164,7 +148,7 @@ def scatter_plot(
             plot_df,
             x=x,
             y=y,
-            hover_name=hover_name if hover_name and hover_name in plot_df.columns else None,
+            hover_name=hover_name,
             color=color,
             size=actual_size,
             trendline=trendline,
@@ -178,7 +162,7 @@ def scatter_plot(
             plot_df,
             x=x,
             y=y,
-            hover_name=hover_name if hover_name and hover_name in plot_df.columns else None,
+            hover_name=hover_name,
             color=color,
             size=actual_size,
             log_x=log_x,
@@ -199,9 +183,9 @@ def histogram_chart(
     x: str,
     title: str = "",
     nbins: int = 30,
-    color: Optional[str] = None,
     log_x: bool = False,
-    bar_color: str = PRIMARY_COLOR,
+    log_y: bool = False,
+    color: Optional[str] = None,
     height: int = 380
 ) -> go.Figure:
     """Standardized histogram."""
@@ -211,33 +195,32 @@ def histogram_chart(
         df,
         x=x,
         nbins=nbins,
-        color=color,
         log_x=log_x,
-        color_discrete_sequence=[bar_color]
-    )
-    fig.update_traces(marker_line_width=0.5, marker_line_color=SURFACE_COLOR, opacity=0.85)
-    return _apply_theme(fig, title, height)
-
-
-def box_plot(
-    df: pd.DataFrame,
-    x: str,
-    y: str,
-    title: str = "",
-    color: Optional[str] = None,
-    height: int = 420
-) -> go.Figure:
-    """Standardized box plot."""
-    if df.empty:
-        return _apply_theme(go.Figure(), title, height)
-    fig = px.box(
-        df,
-        x=x,
-        y=y,
+        log_y=log_y,
         color=color,
         color_discrete_sequence=COLOR_SEQUENCE
     )
     fig.update_traces(marker_line_width=1, marker_line_color=SURFACE_COLOR, opacity=0.85)
+    return _apply_theme(fig, title, height)
+
+
+def heatmap_chart(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    z: str,
+    title: str = "",
+    height: int = 450
+) -> go.Figure:
+    """Heatmap for 2D density/aggregates."""
+    if df.empty:
+        return _apply_theme(go.Figure(), title, height)
+    pivot = df.pivot(index=y, columns=x, values=z)
+    fig = px.imshow(
+        pivot,
+        color_continuous_scale="Purples",
+        aspect="auto"
+    )
     return _apply_theme(fig, title, height)
 
 
@@ -247,7 +230,7 @@ def stacked_area_chart(
     y: str,
     color: str,
     title: str = "",
-    height: int = 420
+    height: int = 450
 ) -> go.Figure:
     """Stacked area chart for time-series proportions."""
     if df.empty:
@@ -269,7 +252,7 @@ def choropleth_map(
     z: str,
     title: str = "",
     hover_name: Optional[str] = None,
-    height: int = 480
+    height: int = 500
 ) -> go.Figure:
     """Choropleth world map based on ISO-3166-1 alpha-3 country codes."""
     if df.empty or z not in df.columns:
@@ -307,22 +290,22 @@ def choropleth_map(
     fig.update_geos(
         bgcolor="rgba(0,0,0,0)",
         showocean=True,
-        oceancolor=BG_COLOR,
+        oceancolor="#0F1117",
         showland=True,
         landcolor="#1A1E29",
         showcountries=True,
         countrycolor="#2D3344",
         countrywidth=0.6,
         showlakes=True,
-        lakecolor=BG_COLOR,
-        framecolor=BORDER_COLOR
+        lakecolor="#0F1117",
+        framecolor="#262A38"
     )
     fig.update_layout(
         coloraxis_colorbar=dict(
-            title=dict(text=z.replace("_", " ").title(), font=dict(color=TEXT_PRIMARY, size=11)),
-            tickfont=dict(color=TEXT_MUTED, size=10),
+            title=dict(text=z.replace("_", " ").title(), font=dict(color="#EAECF0", size=11)),
+            tickfont=dict(color="#9AA1B1", size=10),
             len=0.75,
-            thickness=14
+            thickness=15
         )
     )
     return _apply_theme(fig, title, height)
@@ -333,7 +316,7 @@ def grouped_bar_chart(
     x: str,
     y_cols: List[str],
     title: str = "",
-    height: int = 400
+    height: int = 420
 ) -> go.Figure:
     """Grouped bar chart for multiple metrics across items."""
     if df.empty:
@@ -345,8 +328,7 @@ def grouped_bar_chart(
                 name=col,
                 x=df[x],
                 y=df[col],
-                marker_color=COLOR_SEQUENCE[idx % len(COLOR_SEQUENCE)],
-                opacity=0.9
+                marker_color=COLOR_SEQUENCE[idx % len(COLOR_SEQUENCE)]
             )
         )
     fig.update_layout(barmode="group")

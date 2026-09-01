@@ -1,14 +1,9 @@
-"""Page 6: Historical & Geographic Trends (Redesigned SaaS Layout)."""
+"""Page 6: Historical & Geographic Trends (Optimized Performance)."""
 import streamlit as st
 import pandas as pd
 
 from src.analytics import country_financials, decade_genre_heatmap, yearly_financials
-from src.components import (
-    empty_state,
-    filter_status_bar,
-    inject_custom_css,
-    page_header
-)
+from src.components import empty_state, inject_custom_css, page_header
 from src.data_loader import (
     load_country_bridge,
     load_country_summary,
@@ -18,16 +13,10 @@ from src.data_loader import (
 )
 from src.filters import apply_global_filters, render_global_filters
 from src.utils import VOTE_COUNT_MIN
-from src.visualizations import (
-    ACCENT_FINANCE,
-    PRIMARY_COLOR,
-    bar_chart,
-    choropleth_map,
-    line_chart,
-    stacked_area_chart
-)
+from src.visualizations import bar_chart, choropleth_map, line_chart, stacked_area_chart
 
 inject_custom_css()
+page_header("📈 Historical & Geographic Trends", "Longitudinal release evolutions, decadal genre shares, and international film production footprint.")
 
 # 1. Lazy load fact table
 movies_df = load_movies()
@@ -36,25 +25,17 @@ movies_df = load_movies()
 filters = render_global_filters(movies_df)
 filtered_df = apply_global_filters(movies_df, filters)
 
-# 3. Page Header & Filter Status
-page_header(
-    title="Historical & Geographic Trends",
-    subtitle="Longitudinal release trajectories, decadal genre market shares, and international film production footprint.",
-    eyebrow="MACRO TRENDS"
-)
-filter_status_bar(filters, len(movies_df), len(filtered_df))
-
 if filtered_df.empty:
-    empty_state("No movie records found matching active filter criteria.")
+    empty_state("No movie records found for active filters.")
     st.stop()
 
 is_default = (len(filtered_df) == len(movies_df))
 
-tab_historical, tab_geo = st.tabs(["📅 Release & Decadal Evolution", "🌍 Global Production Footprint"])
+tab_historical, tab_geo = st.tabs(["📅 Historical & Decadal Trends", "🌍 Global Production Footprint"])
 
 # ==================== TAB 1: HISTORICAL ====================
 with tab_historical:
-    st.markdown("### Longitudinal Catalog & Box Office Growth")
+    st.markdown("### 📅 Longitudinal Catalog & Box Office Growth")
     yearly_data = load_yearly_summary() if is_default else yearly_financials(filtered_df)
     
     if not yearly_data.empty:
@@ -63,7 +44,7 @@ with tab_historical:
             fig_vol = line_chart(yearly_data, x="release_year", y="movie_count", title="Annual Movie Release Count")
             st.plotly_chart(fig_vol, use_container_width=True)
         with col_t2:
-            fig_rev = line_chart(yearly_data, x="release_year", y=["total_revenue", "total_budget"], title="Annual Box Office & Budget Trajectory ($ USD)")
+            fig_rev = line_chart(yearly_data, x="release_year", y=["total_revenue", "total_budget"], title="Total Box Office & Budget Trajectory ($ USD)")
             st.plotly_chart(fig_rev, use_container_width=True)
             
         # Decadal Stacked Area
@@ -84,7 +65,7 @@ with tab_historical:
 
 # ==================== TAB 2: GEOGRAPHIC ====================
 with tab_geo:
-    st.markdown("### Worldwide Film Production Footprint")
+    st.markdown("### 🌍 Worldwide Film Production Footprint")
     st.caption("ℹ️ **~13.8%** of catalog titles have no recorded production country; these are excluded from regional breakdowns to avoid an uninformative 'Unknown' country bucket.")
     
     if is_default:
@@ -95,12 +76,12 @@ with tab_geo:
         
     if not country_stats.empty:
         map_metric = st.selectbox(
-            "Choropleth Visual Dimension",
+            "Choropleth Metric",
             options=["movie_count", "total_revenue", "avg_rating", "avg_popularity"],
             format_func=lambda x: {
                 "movie_count": "Total Movie Production Count",
-                "total_revenue": "Total Box Office Gross ($ USD)",
-                "avg_rating": f"Average Critical Rating (Min {VOTE_COUNT_MIN} Votes)",
+                "total_revenue": "Total Box Office Revenue ($)",
+                "avg_rating": f"Average Rating (Min {VOTE_COUNT_MIN} Votes)",
                 "avg_popularity": "Average TMDB Popularity Score"
             }.get(x, x)
         )
@@ -123,24 +104,10 @@ with tab_geo:
         
         col_c1, col_c2 = st.columns(2)
         with col_c1:
-            fig_top_cnt = bar_chart(
-                country_stats.head(10),
-                x="movie_count",
-                y="country_name",
-                orientation="h",
-                bar_color=PRIMARY_COLOR,
-                title="Top 10 Countries by Production Volume"
-            )
+            fig_top_cnt = bar_chart(country_stats.head(10), x="movie_count", y="country_name", orientation="h", title="Top 10 Countries by Production Volume")
             st.plotly_chart(fig_top_cnt, use_container_width=True)
         with col_c2:
-            fig_top_rev = bar_chart(
-                country_stats.sort_values("total_revenue", ascending=False).head(10),
-                x="total_revenue",
-                y="country_name",
-                orientation="h",
-                bar_color=ACCENT_FINANCE,
-                title="Top 10 Countries by Box Office ($ USD)"
-            )
+            fig_top_rev = bar_chart(country_stats.sort_values("total_revenue", ascending=False).head(10), x="total_revenue", y="country_name", orientation="h", title="Top 10 Countries by Box Office ($ USD)")
             st.plotly_chart(fig_top_rev, use_container_width=True)
     else:
         st.info("Insufficient country data in selection.")
